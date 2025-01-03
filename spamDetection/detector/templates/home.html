@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spam Detection</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            padding: 30px;
+            background: #1e1e1e;
+            border-radius: 20px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 1.8em;
+            margin-bottom: 15px;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 600;
+        }
+
+        h1 i {
+            margin-right: 10px;
+            color: #4caf50;
+        }
+
+        p {
+            font-size: 1em;
+            margin-bottom: 15px;
+            color: #bbb;
+            line-height: 1.4;
+        }
+
+        form {
+            display: center;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #333;
+            background: #252525;
+            color: #e0e0e0;
+            border-radius: 6px;
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+
+        .btn {
+            padding: 10px 25px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: 500;
+            background-color: #2a2a2a;
+        }
+
+        .result.spam {
+            background-color: #3b1818;
+            color: #ff6b6b;
+        }
+
+        .result.ham {
+            background-color: #183b18;
+            color: #8bc34a;
+        }
+
+        .message {
+            margin-top: 10px;
+            font-size: 0.9em;
+            font-weight: 400;
+            color: #e0e0e0;
+        }
+
+        .message.spam {
+            color: #ff6b6b;
+        }
+
+        .message.ham {
+            color: #8bc34a;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+                width: 90%;
+            }
+
+            .btn {
+                padding: 10px 20px;
+                font-size: 0.9em;
+            }
+
+            h1 {
+                font-size: 1.4em;
+            }
+
+            .result {
+                padding: 10px;
+                font-size: 0.95em;
+            }
+
+            .form-control {
+                padding: 10px;
+            }
+
+            p {
+                font-size: 0.9em;
+            }
+
+            .message {
+                font-size: 0.95em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><i class="fas fa-shield-alt"></i> Spam Detection</h1>
+        <p>Submit your message below to evaluate for spam detection.</p>
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="btn"><i class="fas fa-search"></i> Analyze</button>
+        </form>
+        {% if result %}
+            <div class="result {{ result|lower }}">
+                <h2>Result: {{ result }}</h2>
+                {% if result == "Ham" %}
+                    <p class="message ham">The message is determined to be correct and appropriate.</p>
+                {% elif result == "Spam" %}
+                    <p class="message spam">The message has been identified as spam and should not be trusted.</p>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
