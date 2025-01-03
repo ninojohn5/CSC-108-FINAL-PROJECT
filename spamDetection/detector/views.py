@@ -22,55 +22,55 @@ from collections import Counter
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global variables for preprocessing
-stop_words = None
-lemmatizer = None
-cached_lemmas = {}
+# Singleton for NLTK resources
+class NLTKResources:
+    """Singleton for initializing and caching NLTK resources."""
+    _stop_words = None
+    _lemmatizer = None
 
-def init_nltk_resources():
-    """Initialize NLTK resources and set stopwords/lemmatizer."""
-    global stop_words, lemmatizer
-    try:
-        nltk.download('stopwords', quiet=True)
-        nltk.download('wordnet', quiet=True)
-        stop_words = set(stopwords.words('english')) - {'not', 'no', 'without'}
-        lemmatizer = WordNetLemmatizer()
-    except Exception as e:
-        logger.error(f"Error initializing NLTK resources: {e}")
+    @classmethod
+    def initialize(cls):
+        if not cls._stop_words or not cls._lemmatizer:
+            nltk.download('stopwords', quiet=True)
+            nltk.download('wordnet', quiet=True)
+            cls._stop_words = set(stopwords.words('english')) - {'not', 'no', 'without'}
+            cls._lemmatizer = WordNetLemmatizer()
+        return cls._stop_words, cls._lemmatizer
+
+# Text preprocessing
+cached_lemmas = {}
 
 def preprocess_text(text):
     """Preprocess a single text input."""
-    if not stop_words or not lemmatizer:
-        init_nltk_resources()
-
     try:
+        stop_words, lemmatizer = NLTKResources.initialize()
         text = re.sub(r'http\S+|www\S+|https\S+', '', text)  # Remove URLs
         text = re.sub(r'\S+@\S+', '', text)  # Remove emails
         text = re.sub(r'[^a-zA-Z0-9\s@#]', ' ', text)  # Remove unwanted characters
         text = re.sub(r'\s+', ' ', text).strip().lower()  # Normalize spaces and lowercase
         text = emoji.demojize(text)  # Convert emojis to text
-        processed = []
-        for word in text.split():
-            if word in stop_words:
-                continue
-            if word not in cached_lemmas:
-                cached_lemmas[word] = lemmatizer.lemmatize(word)
-            processed.append(cached_lemmas[word])
+        processed = [
+            cached_lemmas.setdefault(word, lemmatizer.lemmatize(word))
+            for word in text.split()
+            if word not in stop_words
+        ]
         return ' '.join(processed)
     except Exception as e:
         logger.error(f"Preprocessing error: {e}")
         return text
 
-# Load dataset
+# Load dataset with chunking
 try:
-    dataset = pd.read_csv('data/emails.csv').drop_duplicates(subset=['text']).dropna(subset=['text', 'spam'])
+    dataset_path = 'data/emails.csv'
+    dataset = pd.read_csv(dataset_path, usecols=['text', 'spam']).drop_duplicates(subset=['text']).dropna()
+    dataset['text'] = dataset['text'].map(preprocess_text)
     if dataset.empty:
         raise ValueError("Dataset is empty after preprocessing.")
-    dataset['text'] = dataset['text'].map(preprocess_text)
 except Exception as e:
     logger.error(f"Error loading dataset: {e}")
     dataset = pd.DataFrame(columns=['text', 'spam'])
 
+# Check if dataset is valid
 if not dataset.empty:
     X = dataset['text']
     y = dataset['spam']
@@ -79,19 +79,17 @@ if not dataset.empty:
     # Check class distribution
     class_distribution = Counter(y_train)
     logger.info(f"Class distribution: {class_distribution}")
-    use_smote = class_distribution[1] / class_distribution[0] < 0.5  # Adjust threshold as needed
+    use_smote = class_distribution[1] / class_distribution[0] < 0.5  # Adjust threshold
 
     # Build pipeline
-    pipeline_steps = [
-        ('tfidf', TfidfVectorizer(max_features=2000, ngram_range=(1, 2)))
-    ]
+    pipeline_steps = [('tfidf', TfidfVectorizer(max_features=1000, ngram_range=(1, 2)))]
     if use_smote:
         pipeline_steps.append(('smote', SMOTE(random_state=42)))
     pipeline_steps.append(('classifier', VotingClassifier(
         estimators=[
             ('nb', MultinomialNB(alpha=0.1)),
             ('lr', LogisticRegression(max_iter=1000, random_state=42)),
-            ('rf', RandomForestClassifier(n_estimators=200, max_depth=20, n_jobs=-1, random_state=42))
+            ('rf', RandomForestClassifier(n_estimators=100, max_depth=15, n_jobs=-1, random_state=42))
         ],
         voting='soft'
     )))
@@ -105,7 +103,7 @@ if not dataset.empty:
     except Exception as e:
         logger.error(f"Error during training: {e}")
 
-    # Evaluate model
+    # Evaluation function
     def evaluate_model(model, X_test, y_test):
         try:
             y_pred = model.predict(X_test)
