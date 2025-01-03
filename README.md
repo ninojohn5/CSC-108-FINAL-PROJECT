@@ -82,6 +82,20 @@ Replace `myapp` with your app's name.
 
 ## 6. Run the Development Server
 
+## Install Packages:
+Run these commands in your terminal:
+```bash
+pip install pandas
+pip install emoji
+pip install numpy
+pip install nltk
+pip install scikit-learn
+pip install imbalanced-learn
+pip install django
+pip install joblib
+pip install whitenoise
+
+```
 Start the development server to test your setup:
 
 ```bash
@@ -208,23 +222,7 @@ If there are any specific packages your team uses, such as djangorestframework, 
 pip install -r requirements.txt
 ```
 
-## Install Packages:
-Run these commands in your terminal:
 
-```bash
-
-
-pip install pandas
-pip install emoji
-pip install numpy
-pip install nltk
-pip install scikit-learn
-pip install imbalanced-learn
-pip install django
-pip install joblib
-pip install whitenoise
-
-```
 
 ```bash
 Download NLTK Resources:
