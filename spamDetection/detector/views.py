@@ -16,12 +16,13 @@ from imblearn.over_sampling import SMOTE
 from django.shortcuts import render
 from .forms import MessageForm
 import logging
+from collections import Counter
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Preprocessing components
+# Global variables for preprocessing
 stop_words = None
 lemmatizer = None
 cached_lemmas = {}
@@ -29,13 +30,16 @@ cached_lemmas = {}
 def init_nltk_resources():
     """Initialize NLTK resources and set stopwords/lemmatizer."""
     global stop_words, lemmatizer
-    nltk.download('stopwords', quiet=True)
-    nltk.download('wordnet', quiet=True)
-    stop_words = set(stopwords.words('english')) - {'not', 'no', 'without'}
-    lemmatizer = WordNetLemmatizer()
+    try:
+        nltk.download('stopwords', quiet=True)
+        nltk.download('wordnet', quiet=True)
+        stop_words = set(stopwords.words('english')) - {'not', 'no', 'without'}
+        lemmatizer = WordNetLemmatizer()
+    except Exception as e:
+        logger.error(f"Error initializing NLTK resources: {e}")
 
 def preprocess_text(text):
-    """Preprocess a single text input efficiently."""
+    """Preprocess a single text input."""
     if not stop_words or not lemmatizer:
         init_nltk_resources()
 
@@ -44,7 +48,7 @@ def preprocess_text(text):
         text = re.sub(r'\S+@\S+', '', text)  # Remove emails
         text = re.sub(r'[^a-zA-Z0-9\s@#]', ' ', text)  # Remove unwanted characters
         text = re.sub(r'\s+', ' ', text).strip().lower()  # Normalize spaces and lowercase
-        text = emoji.demojize(text)  # Convert emojis
+        text = emoji.demojize(text)  # Convert emojis to text
         processed = []
         for word in text.split():
             if word in stop_words:
@@ -57,7 +61,7 @@ def preprocess_text(text):
         logger.error(f"Preprocessing error: {e}")
         return text
 
-# Load and validate dataset
+# Load dataset
 try:
     dataset = pd.read_csv('data/emails.csv').drop_duplicates(subset=['text']).dropna(subset=['text', 'spam'])
     if dataset.empty:
@@ -72,20 +76,28 @@ if not dataset.empty:
     y = dataset['spam']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
 
-    # Build and train pipeline
-    pipeline = ImbPipeline([
-        ('tfidf', TfidfVectorizer(max_features=2000, ngram_range=(1, 2))),
-        ('smote', SMOTE(random_state=42)),
-        ('classifier', VotingClassifier(
-            estimators=[
-                ('nb', MultinomialNB(alpha=0.1)),
-                ('lr', LogisticRegression(max_iter=1000, random_state=42)),
-                ('rf', RandomForestClassifier(n_estimators=200, max_depth=20, n_jobs=-1, random_state=42))
-            ],
-            voting='soft'
-        ))
-    ])
+    # Check class distribution
+    class_distribution = Counter(y_train)
+    logger.info(f"Class distribution: {class_distribution}")
+    use_smote = class_distribution[1] / class_distribution[0] < 0.5  # Adjust threshold as needed
 
+    # Build pipeline
+    pipeline_steps = [
+        ('tfidf', TfidfVectorizer(max_features=2000, ngram_range=(1, 2)))
+    ]
+    if use_smote:
+        pipeline_steps.append(('smote', SMOTE(random_state=42)))
+    pipeline_steps.append(('classifier', VotingClassifier(
+        estimators=[
+            ('nb', MultinomialNB(alpha=0.1)),
+            ('lr', LogisticRegression(max_iter=1000, random_state=42)),
+            ('rf', RandomForestClassifier(n_estimators=200, max_depth=20, n_jobs=-1, random_state=42))
+        ],
+        voting='soft'
+    )))
+    pipeline = ImbPipeline(pipeline_steps)
+
+    # Train model
     try:
         pipeline.fit(X_train, y_train)
         logger.info("Model training complete.")
@@ -108,13 +120,16 @@ if not dataset.empty:
 
     evaluate_model(pipeline, X_test, y_test)
 
-    # Load model
+    # Load trained model
     model_loaded = load('spam_pipeline.pkl')
 
     def predict_message(message):
+        """Predict whether a message is spam or ham."""
         try:
+            if not model_loaded:
+                return "Model not loaded. Contact admin."
             if not message.strip():
-                return "Invalid input"
+                return "Invalid input. Please enter a non-empty message."
             message = preprocess_text(message)
             prediction = model_loaded.predict([message])
             return "Spam" if prediction[0] == 1 else "Ham"
@@ -124,14 +139,21 @@ if not dataset.empty:
 
     # Django view
     def home(request):
+        """Handle home page requests."""
         result = None
-        if request.method == "POST":
-            form = MessageForm(request.POST)
-            if form.is_valid():
-                message = form.cleaned_data['text']
-                result = predict_message(message)
+        if not dataset.empty:
+            if request.method == "POST":
+                form = MessageForm(request.POST)
+                if form.is_valid():
+                    message = form.cleaned_data['text']
+                    result = predict_message(message)
+                else:
+                    result = "Invalid input. Please enter a valid message."
+            else:
+                form = MessageForm()
         else:
-            form = MessageForm()
+            form = None
+            result = "Dataset unavailable. Contact admin."
         return render(request, 'home.html', {'form': form, 'result': result})
 else:
     logger.error("No dataset available. Application will not proceed.")
