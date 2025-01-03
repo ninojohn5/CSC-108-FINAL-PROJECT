@@ -56,21 +56,19 @@ def preprocess_text(text):
         logger.error(f"Error during preprocessing: {e}")
         return text  # Return original text on error
 
-# Load datasets with error handling
+# Load dataset with error handling
 try:
-    dataset1 = pd.read_csv('data/emails.csv')  # Load first dataset
-    dataset2 = pd.read_csv('data/spam.csv', encoding='ISO-8859-1')  # Load second dataset
+    dataset1 = pd.read_csv('data/emails.csv')  # Load the dataset
 except FileNotFoundError as e:
     logger.error(f"Dataset not found: {e.filename}. Check the data directory.")
     dataset1 = pd.DataFrame(columns=['text', 'spam'])  # Fallback to empty dataframe
-    dataset2 = pd.DataFrame(columns=['text', 'spam'])
 
-# Combine datasets and clean duplicates or missing values
-dataset = pd.concat([dataset1, dataset2], ignore_index=True)
-dataset.drop_duplicates(subset=['text'], inplace=True)
-dataset.dropna(subset=['text', 'spam'], inplace=True)
+# Clean the dataset and handle missing values
+dataset = dataset1.drop_duplicates(subset=['text'])
+dataset = dataset.dropna(subset=['text', 'spam'])
 
 # Apply preprocessing to the text column
+dataset = dataset.copy()  # Ensure we're working with a copy of the DataFrame
 dataset['text'] = dataset['text'].apply(preprocess_text)
 
 # Separate features (X) and target variable (y)
