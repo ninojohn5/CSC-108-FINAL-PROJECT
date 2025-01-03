@@ -213,6 +213,7 @@ Run these commands in your terminal:
 
 ```bash
 
+
 pip install pandas
 pip install emoji
 pip install numpy
@@ -220,6 +221,9 @@ pip install nltk
 pip install scikit-learn
 pip install imbalanced-learn
 pip install django
+pip install joblib
+pip install whitenoise
+
 ```
 
 ```bash
@@ -240,4 +244,4 @@ django – Web framework to handle HTTP requests and render forms
 
 
 ## IF NAAY ERROR SA PAG PA RUN PATABANG LANG MOS GPT, labyo
-"# CSC-108-FINAL-PROJECT" 
+
