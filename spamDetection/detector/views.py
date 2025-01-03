@@ -54,7 +54,7 @@ def preprocess_text(text):
         return text
     except Exception as e:
         logger.error(f"Error during preprocessing: {e}")
-        return ""
+        return text  # Return original text on error
 
 # Load datasets with error handling
 try:
@@ -69,6 +69,7 @@ except FileNotFoundError as e:
 dataset = pd.concat([dataset1, dataset2], ignore_index=True)
 dataset.drop_duplicates(subset=['text'], inplace=True)
 dataset.dropna(subset=['text', 'spam'], inplace=True)
+
 # Apply preprocessing to the text column
 dataset['text'] = dataset['text'].apply(preprocess_text)
 
@@ -115,6 +116,15 @@ try:
 except Exception as e:
     logger.error(f"Error during grid search: {e}")
 
+# Save the trained model to disk (only once)
+def save_model(model, filename='spam_pipeline.pkl'):
+    """Save the trained model to disk."""
+    try:
+        dump(model, filename)  # Save model using joblib
+        logger.info(f"Model saved to {filename}")
+    except Exception as e:
+        logger.error(f"Error saving model: {e}")
+
 # Evaluate the trained model
 try:
     y_pred = grid_search.predict(X_test)  # Predict test set labels
@@ -133,12 +143,8 @@ try:
 except Exception as e:
     logger.error(f"Error during evaluation: {e}")
 
-# Save the trained model to disk
-try:
-    dump(grid_search, 'spam_pipeline.pkl')  # Save model using joblib
-    logger.info("Model saved to spam_pipeline.pkl")
-except Exception as e:
-    logger.error(f"Error saving model: {e}")
+# Save model after training
+save_model(grid_search)
 
 # Function to predict spam or ham for new messages
 def predict_message(message):
@@ -146,7 +152,7 @@ def predict_message(message):
     try:
         if not message.strip():
             return "Invalid input"  # Handle empty input
-        # Load the saved model and preprocess the message
+        # Load the saved model and preprocess the message (only once)
         model = load('spam_pipeline.pkl')
         message = preprocess_text(message)
         prediction = model.predict([message])
